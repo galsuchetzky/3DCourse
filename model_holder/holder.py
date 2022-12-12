@@ -1,6 +1,16 @@
 import bpy
+#import bmesh
+
 from math import radians
 from mathutils import Vector
+
+def copy(target_object):
+    """
+    Copy the active object in place.
+    """
+    bpy.ops.object.duplicate(linked=False)
+    return bpy.context.active_object
+    
 
 def remove_over_xy_plane(target_object):
     """
@@ -26,12 +36,14 @@ def remove_over_xy_plane(target_object):
 
     # Apply the modifier.
     print(str(target_object.modifiers[0].name))
+    print(str(target_object.modifiers[0].operation))
     bpy.ops.object.modifier_apply(modifier=target_object.modifiers[0].name)
 
     # Delete the boolean cube.
     bpy.ops.object.select_all(action='DESELECT')
     boolean_cube.select_set(True)
     bpy.ops.object.delete()
+    
     
 def convex_hull(target_object):
     """
@@ -85,18 +97,69 @@ def delete_blocking_faces(target_object):
     # Change back to object mode.
     bpy.ops.object.mode_set(mode='OBJECT')
 
+
 def thicken_shell(target_object, thickness):
     """
     Given a shell, extrudes it along the normals to thicken it.
     """
-    bpy.ops.mesh.extrude_region_shrink_fatten(MESH_OT_extrude_region={"use_normal_flip":False, "use_dissolve_ortho_edges":False, "mirror":False}, TRANSFORM_OT_shrink_fatten={"value":0.266901, "use_even_offset":False, "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "release_confirm":True, "use_accurate":False})
-
+    # Set the target object to be the active object.
+    bpy.context.view_layer.objects.active = target_object
+    
+    # Extrude along the normals.
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.extrude_region_shrink_fatten(MESH_OT_extrude_region={"use_normal_flip":False, "use_dissolve_ortho_edges":False, "mirror":False}, TRANSFORM_OT_shrink_fatten={"value":0.1, "use_even_offset":False, "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "release_confirm":True, "use_accurate":False})
+    bpy.ops.object.mode_set(mode='OBJECT')
+    
+    # Set scale for the target object to 1.1 of it's size.
+    target_object.scale = (1.1, 1.1, 1.1)
+        
+def apply_subsurf_modifier(target_object):
+    """
+    Add subsurf modifier and apply it to to the target object.
+    """
+    mod_bool = target_object.modifiers.new('subsurf', 'SUBSURF')
+    target_object.modifiers[0].levels = 3
+    bpy.ops.object.modifier_apply(modifier=target_object.modifiers[0].name)
+    
+def get_inner_vertices(target_object):
+    """
+    Iterate over all faces and collect the vertices that are attached to faces with normals that point up.
+    """
+    # Deselect all vertices.
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='DESELECT')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    
+    # Get all vertices that are attached to a polygon with normal that points up.
+    vertices = []
+    for f in target_object.data.polygons:            
+        for v in f.vertices:
+            up = Vector((0, 0, 1))
+            test_angle = radians(90)
+            if f.normal.angle(up) < test_angle:
+                vertices.append(v)
+#                target_object.data.vertices[v].select = True
+            
+    return vertices
+    
+def raise_vertices(target_object, limit_object, vertices):
+    """
+    For each vertex of the target_object in the vertices list, raise it up by small steps until it reaches 0 or collides with the limit object.
+    If collided, leave it at the last non-colliding location.
+    If reached 0, return it to it's place (maybe leave it at 0?)
+    try this resource: https://blender.stackexchange.com/questions/31693/how-to-find-if-a-point-is-inside-a-mesh
+    """
 
 if __name__ == '__main__':
     # Save target object.
-    target_object = bpy.context.active_object
+    limit_object = bpy.context.active_object
     
+    target_object = copy(limit_object)
     remove_over_xy_plane(target_object)
     convex_hull(target_object)
     delete_blocking_faces(target_object)
     thicken_shell(target_object, 1)
+    apply_subsurf_modifier(target_object)
+    vertices = get_inner_vertices(target_object)
+    
+    
