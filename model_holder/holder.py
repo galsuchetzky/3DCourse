@@ -85,6 +85,12 @@ def delete_blocking_faces(target_object):
     # Change back to object mode.
     bpy.ops.object.mode_set(mode='OBJECT')
 
+def thicken_shell(target_object, thickness):
+    """
+    Given a shell, extrudes it along the normals to thicken it.
+    """
+    bpy.ops.mesh.extrude_region_shrink_fatten(MESH_OT_extrude_region={"use_normal_flip":False, "use_dissolve_ortho_edges":False, "mirror":False}, TRANSFORM_OT_shrink_fatten={"value":0.266901, "use_even_offset":False, "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "release_confirm":True, "use_accurate":False})
+
 
 if __name__ == '__main__':
     # Save target object.
@@ -93,3 +99,4 @@ if __name__ == '__main__':
     remove_over_xy_plane(target_object)
     convex_hull(target_object)
     delete_blocking_faces(target_object)
+    thicken_shell(target_object, 1)
