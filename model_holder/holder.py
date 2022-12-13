@@ -118,7 +118,7 @@ def apply_subsurf_modifier(target_object):
     Add subsurf modifier and apply it to to the target object.
     """
     mod_bool = target_object.modifiers.new('subsurf', 'SUBSURF')
-    target_object.modifiers[0].levels = 3
+    target_object.modifiers[0].levels = 2
     bpy.ops.object.modifier_apply(modifier=target_object.modifiers[0].name)
     
 def get_inner_vertices(target_object):
@@ -142,6 +142,17 @@ def get_inner_vertices(target_object):
             
     return vertices
     
+    
+def is_inside(p, max_dist, obj):
+    # max_dist = 1.84467e+19
+    print('resp=', obj.closest_point_on_mesh(p, distance=max_dist))
+    result, point, normal, face = obj.closest_point_on_mesh(p, distance=max_dist)
+    return result
+    p2 = point-p
+    v = p2.dot(normal)
+    print(v)
+    return not(v < 0.0)
+
 def raise_vertices(target_object, limit_object, vertices):
     """
     For each vertex of the target_object in the vertices list, raise it up by small steps until it reaches 0 or collides with the limit object.
@@ -149,6 +160,22 @@ def raise_vertices(target_object, limit_object, vertices):
     If reached 0, return it to it's place (maybe leave it at 0?)
     try this resource: https://blender.stackexchange.com/questions/31693/how-to-find-if-a-point-is-inside-a-mesh
     """
+    print(len(vertices))
+    for v in vertices[:500]:
+        cur_vertex = target_object.data.vertices[vertices[v]]
+        cur_vertex.select = True
+        pos_world = target_object.matrix_world @ cur_vertex.co
+        
+        while not is_inside(cur_vertex.co, 0.001, limit_object) and pos_world.z < 0:
+    #        inside = is_inside(cur_vertex.co, 0.0001, limit_object)
+    #        print('inside:', inside)
+    #        if inside:
+    #            break
+            pos_world = target_object.matrix_world @ cur_vertex.co
+            pos_world.z += 0.0005
+            print(pos_world.z)
+            cur_vertex.co = target_object.matrix_world.inverted() @ pos_world
+    
 
 if __name__ == '__main__':
     # Save target object.
@@ -161,5 +188,7 @@ if __name__ == '__main__':
     thicken_shell(target_object, 1)
     apply_subsurf_modifier(target_object)
     vertices = get_inner_vertices(target_object)
+    print(len(vertices))
+    raise_vertices(target_object, limit_object, vertices)
     
     
