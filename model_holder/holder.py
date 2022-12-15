@@ -49,17 +49,19 @@ def add_attach_port(target_object, z_offset):
     Should be used before the convex hull operation.
     """
     # Get max x to know where to put the port. + 1 to be a bit further.
-    port_x = max([abs((target_object.matrix_world @ v.co).x) for v in target_object.data.vertices]) + 1
+    port_x = max([(target_object.matrix_world @ v.co).x for v in target_object.data.vertices]) + 1
     
     # Calculate the height of the port.
     port_height = abs(min([(target_object.matrix_world @ v.co).z for v in target_object.data.vertices])) / 4
 
-    
     # Calculate the port width.
     port_width = (max([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices]) - min([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices])) / 4
     
+    # Calculate the port y.
+    port_y = (max([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices]) + min([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices])) / 2
+    
     # Add port cube.
-    bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(port_x, 0, z_offset - port_height/2), scale=(1, port_width, port_height))
+    bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(port_x, port_y, z_offset - port_height/2), scale=(1, port_width, port_height))
     port_cube = bpy.context.selected_objects[0]
     port_cube.name = 'port_cube'
     
@@ -212,9 +214,10 @@ def raise_vertices(target_object, limit_object, vertices):
             pos_world.z += 0.05
             cur_vertex.co = target_object.matrix_world.inverted() @ pos_world
 
-def get_attach_port_vertices(target_object):
+def get_attach_port_vertices(target_object, type):
     """
     Selects the port vertices and returns them.
+    use type to specify hanger or holder with HANGER, HOLDER.
     """
     
     # Deselect all vertices.
@@ -222,16 +225,54 @@ def get_attach_port_vertices(target_object):
     bpy.ops.mesh.select_all(action='DESELECT')
     bpy.ops.object.mode_set(mode='OBJECT')
     
-    # Get the 4 vertices.
-    vertices = sorted(target_object.data.vertices, reverse=True, key=lambda v: (target_object.matrix_world @ v.co).x)[:4]
+    # Get the 4 vertices. Note that if we calculate for the  hanger we don't want to reverse.
+    vertices = sorted(target_object.data.vertices, reverse=type=='HOLDER', key=lambda v: (target_object.matrix_world @ v.co).x)[:4]
     
-#    for v in vertices:
-#        v.select = True
+    print(vertices)
+    for v in vertices:
+        v.select = True
         
     return vertices
 
+def import_hanger(type):
+    """
+    imports the requested hanger.
+    TABLE for table mount.
+    WALL for wall mount.
+    CYLINDER for cylinder mount.
+    """
+    wall_mount_filepath = r"E:\Projects\3DCourse\files\mounts\wall_mount.stl"
+    bpy.ops.import_mesh.stl(filepath=wall_mount_filepath)
+    hanger = bpy.context.active_object
+    
+    return hanger
 
-if __name__ == '__main__':
+def connect_holder_hanger(holder, hanger):
+    # Join the holder and the hanger.
+    holder.select_set(True)
+    hanger.select_set(True)
+    bpy.ops.object.join()
+    
+    # create the connecting arm.
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.convex_hull()
+    
+    # Make manifold.
+    bpy.ops.mesh.normals_make_consistent()
+    bpy.ops.mesh.print3d_clean_non_manifold()
+    
+    # Change back to object mode.
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+
+
+
+
+
+def main():
+    """
+    Runs the logic of the program.
+    """
     z_offset=0
     wall_thickness = 10
     
@@ -239,31 +280,84 @@ if __name__ == '__main__':
     limit_object = bpy.context.active_object
     
     # Copy the target object.
-    target_object = copy(limit_object)
+    holder = copy(limit_object)
     
     # Remove a part from the top, where we dont want the holder to form.
-    remove_over_xy_plane(target_object, z_offset)
+    remove_over_xy_plane(holder, z_offset)
     
     # boolean a connection port to the object.
-    add_attach_port(target_object, z_offset)
+    add_attach_port(holder, z_offset)
     
     # Calculate the convex hull.
-    convex_hull(target_object)
-    
-    # Remove a part from the top, where we dont want the holder to form.
-#    remove_over_xy_plane(target_object, z_offset)
+    convex_hull(holder)
     
     # Remove all faces that restrict the object from being pulled straight up.
-    delete_blocking_faces(target_object)
+    delete_blocking_faces(holder)
     
     # Scale the shell a bit.
-    uniform_scale(target_object, 1.05)
+    uniform_scale(holder, 1.05)
     
     # Thicken the shell to create walls.
-    thicken_shell(target_object, wall_thickness)
+    thicken_shell(holder, wall_thickness)
     
     # Get the attach port vertices.
-    port_vertices = get_attach_port_vertices(target_object)
+    port_vertices = get_attach_port_vertices(holder, 'HOLDER')
+    
+    # Import the hanger of the specified type.
+    hanger = import_hanger('WALL')
+    
+    # Get the attach port vertices.
+    port_vertices = get_attach_port_vertices(hanger, 'HANGER')
+    
+    # Connect the holder and the hanger with a connecting arm.
+    connect_holder_hanger(holder, hanger)
+    
+def test():
+    """
+    for testing code.
+    """
+    z_offset=0
+    wall_thickness = 10
+    
+    # Save target object.
+    limit_object = bpy.context.active_object
+    
+    # Copy the target object.
+    holder = copy(limit_object)
+    
+    # Remove a part from the top, where we dont want the holder to form.
+    remove_over_xy_plane(holder, z_offset)
+    
+    # boolean a connection port to the object.
+    add_attach_port(holder, z_offset)
+    
+    # Calculate the convex hull.
+    convex_hull(holder)
+    
+    # Remove all faces that restrict the object from being pulled straight up.
+    delete_blocking_faces(holder)
+    
+    # Scale the shell a bit.
+    uniform_scale(holder, 1.05)
+    
+    # Thicken the shell to create walls.
+    thicken_shell(holder, wall_thickness)
+    
+    # Get the attach port vertices.
+    port_vertices = get_attach_port_vertices(holder, 'HOLDER')
+    
+    # Import the hanger of the specified type.
+    hanger = import_hanger('WALL')
+    
+    # Get the attach port vertices.
+    port_vertices = get_attach_port_vertices(hanger, 'HANGER')
+    
+    # Connect the holder and the hanger with a connecting arm.
+    connect_holder_hanger(holder, hanger)
+    
+if __name__ == '__main__':
+    main()
+#    test()
     
 #    apply_subsurf_modifier(target_object)
 #    vertices = get_inner_vertices(target_object)
