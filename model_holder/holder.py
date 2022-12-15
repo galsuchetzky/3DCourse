@@ -17,10 +17,26 @@ def remove_over_xy_plane(target_object, z_offset):
     Removes the part of the target object that is above the XY plane.
     :param z_offset: the z value of the height to remove above.
     """
+    coords0 = target_object.matrix_world @ target_object.data.vertices[0].co
+    max_x = abs(coords0.x)
+    max_y = abs(coords0.y)
+    max_z = coords0.z
+    
+    for v in target_object.data.vertices:
+        coords = target_object.matrix_world @ v.co
+        max_x = max(abs(coords.x), max_x)
+        max_y = max(abs(coords.y), max_y)
+        max_z = max(coords.z, max_z)
+        
+    max_x += 10
+    max_y += 10
+    max_z += 10
+        
+        
     # Get dimentions of the target. +10 to make sure that the cube is bigger than the object.
-    max_x = max([abs((target_object.matrix_world @ v.co).x) for v in target_object.data.vertices]) + 10
-    max_y = max([abs((target_object.matrix_world @ v.co).y) for v in target_object.data.vertices]) + 10
-    max_z = max([(target_object.matrix_world @ v.co).z for v in target_object.data.vertices]) + 10
+#    max_x = max([abs((target_object.matrix_world @ v.co).x) for v in target_object.data.vertices]) + 10
+#    max_y = max([abs((target_object.matrix_world @ v.co).y) for v in target_object.data.vertices]) + 10
+#    max_z = max([(target_object.matrix_world @ v.co).z for v in target_object.data.vertices]) + 10
 
     # Add cube that covers the part of the model that is above the XY plane.
     bpy.ops.mesh.primitive_cube_add(size=2, enter_editmode=False, align='WORLD', location=(0, 0, max_z + z_offset), scale=(max_x, max_y, max_z))
@@ -48,6 +64,7 @@ def add_attach_port(target_object, z_offset):
     Adds an attach port location to the model.
     Should be used before the convex hull operation.
     """
+    #TODO optimize like in the remove over XY function, do only single iteration over all the nodes.
     # Get max x to know where to put the port. + 1 to be a bit further.
     port_x = max([(target_object.matrix_world @ v.co).x for v in target_object.data.vertices]) + 1
     
@@ -64,6 +81,10 @@ def add_attach_port(target_object, z_offset):
     bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(port_x, port_y, -port_height/2 + z_offset), scale=(1, port_width, port_height))
     port_cube = bpy.context.selected_objects[0]
     port_cube.name = 'port_cube'
+    
+    # Rotate the port just a bit so it remains after removing the blocking faces.
+    bpy.ops.transform.rotate(value=radians(-2), orient_axis='Y')
+
     
     # Deselect all and set the active object to be the target again.
     bpy.ops.object.select_all(action='DESELECT')
@@ -111,7 +132,7 @@ def delete_blocking_faces(target_object):
     
     # List all faces with normal less than 90 degrees up.
     faces = [f.index for f in target_object.data.polygons
-             if (f.normal).angle(up) < test_angle]
+             if (target_object.rotation_euler.to_matrix() @ f.normal).angle(up) < test_angle]
 
     # Deselect everything.
     bpy.ops.object.mode_set(mode='EDIT')
