@@ -23,7 +23,7 @@ def remove_over_xy_plane(target_object, z_offset):
     max_z = max([(target_object.matrix_world @ v.co).z for v in target_object.data.vertices]) + 10
 
     # Add cube that covers the part of the model that is above the XY plane.
-    bpy.ops.mesh.primitive_cube_add(size=2, enter_editmode=False, align='WORLD', location=(0, 0, max_z + z_offset), scale=(max_x, max_y, max_z))
+    bpy.ops.mesh.primitive_cube_add(size=2, enter_editmode=False, align='WORLD', location=(0, 0, z_offset), scale=(max_x, max_y, max_z))
     boolean_cube = bpy.context.selected_objects[0]
     boolean_cube.name = 'boolean_cube'
 
@@ -61,7 +61,7 @@ def add_attach_port(target_object, z_offset):
     port_y = (max([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices]) + min([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices])) / 2
     
     # Add port cube.
-    bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(port_x, port_y, z_offset - port_height/2), scale=(1, port_width, port_height))
+    bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(port_x, port_y, z_offset), scale=(1, port_width, port_height))
     port_cube = bpy.context.selected_objects[0]
     port_cube.name = 'port_cube'
     
@@ -239,10 +239,15 @@ def import_hanger(type):
     imports the requested hanger.
     TABLE for table mount.
     WALL for wall mount.
-    CYLINDER for cylinder mount.
+    RING for cylinder mount.
     """
-    wall_mount_filepath = r"E:\Projects\3DCourse\files\mounts\wall_mount.stl"
-    bpy.ops.import_mesh.stl(filepath=wall_mount_filepath)
+    hanger_file_paths = {
+        "TABLE": r"E:\Projects\3DCourse\files\mounts\clamp_frame.stl",
+        "WALL": r"E:\Projects\3DCourse\files\mounts\wall_mount.stl",
+        "RING": r"E:\Projects\3DCourse\files\mounts\ring_mount.stl"
+    }
+    
+    bpy.ops.import_mesh.stl(filepath=hanger_file_paths[type])
     hanger = bpy.context.active_object
     
     return hanger
@@ -273,8 +278,24 @@ def main():
     """
     Runs the logic of the program.
     """
-    z_offset=0
+    # The offset from the z=0 plane where above it the hanger will not be created.
+    z_offset = -40
+    
+    # How much to scale up the shell to have space for the object.
+    # Shouldn't be smaller than 1. the bigger it is the more space the object will have.
+    shell_scaleup = 1.05
+    
+    # The thickness of the shell wall. Will determine how strong the holder is.
     wall_thickness = 10
+    
+    # X rotation of the hanger (to hang on tables or cylinders with different angles).
+    hanger_rotation = 0
+    
+    # For the ring hanger, the radius of the cylinder to hang on.
+    cylinder_radius = 1
+    
+    # The type of the hanger to use. shoud be on of {TABLE, RING, WALL}
+    hanger_type = "TABLE"
     
     # Save target object.
     limit_object = bpy.context.active_object
@@ -295,7 +316,7 @@ def main():
     delete_blocking_faces(holder)
     
     # Scale the shell a bit.
-    uniform_scale(holder, 1.05)
+    uniform_scale(holder, shell_scaleup)
     
     # Thicken the shell to create walls.
     thicken_shell(holder, wall_thickness)
@@ -304,7 +325,7 @@ def main():
     port_vertices = get_attach_port_vertices(holder, 'HOLDER')
     
     # Import the hanger of the specified type.
-    hanger = import_hanger('WALL')
+    hanger = import_hanger(hanger_type)
     
     # Get the attach port vertices.
     port_vertices = get_attach_port_vertices(hanger, 'HANGER')
@@ -316,44 +337,12 @@ def test():
     """
     for testing code.
     """
-    z_offset=0
-    wall_thickness = 10
-    
-    # Save target object.
-    limit_object = bpy.context.active_object
-    
-    # Copy the target object.
-    holder = copy(limit_object)
-    
-    # Remove a part from the top, where we dont want the holder to form.
-    remove_over_xy_plane(holder, z_offset)
-    
-    # boolean a connection port to the object.
-    add_attach_port(holder, z_offset)
-    
-    # Calculate the convex hull.
-    convex_hull(holder)
-    
-    # Remove all faces that restrict the object from being pulled straight up.
-    delete_blocking_faces(holder)
-    
-    # Scale the shell a bit.
-    uniform_scale(holder, 1.05)
-    
-    # Thicken the shell to create walls.
-    thicken_shell(holder, wall_thickness)
-    
-    # Get the attach port vertices.
-    port_vertices = get_attach_port_vertices(holder, 'HOLDER')
-    
     # Import the hanger of the specified type.
-    hanger = import_hanger('WALL')
+    hanger = import_hanger('TABLE')
     
     # Get the attach port vertices.
     port_vertices = get_attach_port_vertices(hanger, 'HANGER')
-    
-    # Connect the holder and the hanger with a connecting arm.
-    connect_holder_hanger(holder, hanger)
+
     
 if __name__ == '__main__':
     main()
