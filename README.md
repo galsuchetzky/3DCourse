@@ -12,7 +12,9 @@ Project for a 3d course.
 # Usage
 In blender, press 'n' to open the toolbar sidepanel (you can also use the small arrow on the left of the view panel).
 You should find a new tab there named "HolderGen".
-Set the parameters how you would like, and click gererate to generate the holder.
+Select the model you would like to generate a holder for.
+Set the parameters how you would like.
+Click gererate to generate the holder.
 
 # Notes
 The hanger itself will be positioned at (0, 0, 0).
