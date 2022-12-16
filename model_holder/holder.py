@@ -3,7 +3,40 @@ import bpy
 
 from math import radians
 from mathutils import Vector
+from functools import wraps
+from time import time
 
+def timing(f):
+    @wraps(f)
+    def wrap(*args, **kw):
+        ts = time()
+        result = f(*args, **kw)
+        te = time()
+        print('func:%r args:[%r, %r] took: %2.4f sec' % (f.__name__, args, kw, te-ts))
+        return result
+    return wrap
+
+@timing
+def get_mins_maxs(target_object):
+    coords0 = target_object.matrix_world @ target_object.data.vertices[0].co
+    max_x = coords0.x
+    max_y = coords0.y
+    max_z = coords0.z
+    min_x = coords0.x
+    min_y = coords0.y
+    min_z = coords0.z
+    for v in target_object.data.vertices:
+        coords = target_object.matrix_world @ v.co
+        max_x = max(coords.x, max_x)
+        max_y = max(coords.y, max_y)
+        max_z = max(coords.z, max_z)
+        min_x = min(coords.x, min_x)
+        min_y = min(coords.y, min_y)
+        min_z = min(coords.z, min_z)
+        
+    return max_x, max_y, max_z, min_x, min_y, min_z
+
+@timing
 def copy(target_object):
     """
     Copy the active object in place.
@@ -11,71 +44,56 @@ def copy(target_object):
     bpy.ops.object.duplicate(linked=False)
     return bpy.context.active_object
     
-
-def remove_over_xy_plane(target_object, z_offset):
+@timing
+def remove_over_xy_plane(target_object, z_offset, dimensions):
     """
     Removes the part of the target object that is above the XY plane.
     :param z_offset: the z value of the height to remove above.
     """
-    coords0 = target_object.matrix_world @ target_object.data.vertices[0].co
-    max_x = abs(coords0.x)
-    max_y = abs(coords0.y)
-    max_z = coords0.z
+    max_x = max(abs(dimensions[0]), abs(dimensions[3])) + 10
+    max_y = max(abs(dimensions[1]), abs(dimensions[2])) + 10
+    max_z = max(dimensions[2], dimensions[5]) + 10
     
-    for v in target_object.data.vertices:
-        coords = target_object.matrix_world @ v.co
-        max_x = max(abs(coords.x), max_x)
-        max_y = max(abs(coords.y), max_y)
-        max_z = max(coords.z, max_z)
-        
-    max_x += 10
-    max_y += 10
-    max_z += 10
-        
-        
-    # Get dimentions of the target. +10 to make sure that the cube is bigger than the object.
-#    max_x = max([abs((target_object.matrix_world @ v.co).x) for v in target_object.data.vertices]) + 10
-#    max_y = max([abs((target_object.matrix_world @ v.co).y) for v in target_object.data.vertices]) + 10
-#    max_z = max([(target_object.matrix_world @ v.co).z for v in target_object.data.vertices]) + 10
-
     # Add cube that covers the part of the model that is above the XY plane.
     bpy.ops.mesh.primitive_cube_add(size=2, enter_editmode=False, align='WORLD', location=(0, 0, max_z + z_offset), scale=(max_x, max_y, max_z))
     boolean_cube = bpy.context.selected_objects[0]
     boolean_cube.name = 'boolean_cube'
-
+    
     # Deselect all and set the active object to be the target again.
     bpy.ops.object.select_all(action='DESELECT')
     bpy.context.view_layer.objects.active = target_object
-
+    
     # Add a boolean modifier to the target object and set it to be the boolean cube.
     mod_bool = target_object.modifiers.new('Boolean', 'BOOLEAN')
     mod_bool.object = boolean_cube
-
+    
     # Apply the modifier.
+    t_start = time()
     bpy.ops.object.modifier_apply(modifier=target_object.modifiers[0].name)
-
+    print(time()-t_start)
+    
     # Delete the boolean cube.
     bpy.ops.object.select_all(action='DESELECT')
     boolean_cube.select_set(True)
     bpy.ops.object.delete()
     
-def add_attach_port(target_object, z_offset):
+@timing  
+def add_attach_port(target_object, z_offset, dimensions):
     """
     Adds an attach port location to the model.
     Should be used before the convex hull operation.
     """
-    #TODO optimize like in the remove over XY function, do only single iteration over all the nodes.
     # Get max x to know where to put the port. + 1 to be a bit further.
-    port_x = max([(target_object.matrix_world @ v.co).x for v in target_object.data.vertices]) + 1
+    port_x = dimensions[0] + 1
     
     # Calculate the height of the port.
-    port_height = abs(min([(target_object.matrix_world @ v.co).z for v in target_object.data.vertices])) / 4
-
+    port_height = abs(dimensions[5]) / 4
+    
     # Calculate the port width.
-    port_width = (max([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices]) - min([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices])) / 4
+    port_width = (dimensions[1] - dimensions[4]) / 4
     
     # Calculate the port y.
-    port_y = (max([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices]) + min([(target_object.matrix_world @ v.co).y for v in target_object.data.vertices])) / 2
+    port_y = (dimensions[1] + dimensions[4]) / 2
     
     # Add port cube.
     bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(port_x, port_y, -port_height/2 + z_offset), scale=(1, port_width, port_height))
@@ -85,7 +103,6 @@ def add_attach_port(target_object, z_offset):
     # Rotate the port just a bit so it remains after removing the blocking faces.
     bpy.ops.transform.rotate(value=radians(-2), orient_axis='Y')
 
-    
     # Deselect all and set the active object to be the target again.
     bpy.ops.object.select_all(action='DESELECT')
     bpy.context.view_layer.objects.active = target_object
@@ -103,7 +120,7 @@ def add_attach_port(target_object, z_offset):
     port_cube.select_set(True)
     bpy.ops.object.delete()
     
-    
+@timing
 def convex_hull(target_object):
     """
     Calculates the convex hull of the given target object.
@@ -117,7 +134,7 @@ def convex_hull(target_object):
     bpy.ops.mesh.convex_hull()
     bpy.ops.object.mode_set(mode='OBJECT')
 
-
+@timing
 def delete_blocking_faces(target_object):
     """
     Deletes all faces with normals that are more than 90 degrees to the positive Z direction.
@@ -143,8 +160,6 @@ def delete_blocking_faces(target_object):
     for face_idx in faces:
         target_object.data.polygons[face_idx].select = True
         
-    print(faces)
-        
     # Delete selected faces.
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.delete(type='FACE')
@@ -155,7 +170,7 @@ def delete_blocking_faces(target_object):
     # Change back to object mode.
     bpy.ops.object.mode_set(mode='OBJECT')
 
-
+@timing
 def thicken_shell(target_object, thickness):
     """
     Given a shell, extrudes it along the normals to thicken it.
@@ -167,7 +182,8 @@ def thicken_shell(target_object, thickness):
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.extrude_region_shrink_fatten(MESH_OT_extrude_region={"use_normal_flip":False, "use_dissolve_ortho_edges":False, "mirror":False}, TRANSFORM_OT_shrink_fatten={"value":thickness, "use_even_offset":False, "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "release_confirm":True, "use_accurate":False})
     bpy.ops.object.mode_set(mode='OBJECT')
-    
+
+@timing    
 def uniform_scale(target_object, s):
     """
     Scales the target object uniformly.
@@ -182,7 +198,8 @@ def apply_subsurf_modifier(target_object):
     mod_bool = target_object.modifiers.new('subsurf', 'SUBSURF')
     target_object.modifiers[0].levels = 2
     bpy.ops.object.modifier_apply(modifier=target_object.modifiers[0].name)
-    
+
+@timing    
 def get_inner_vertices(target_object):
     """
     Iterate over all faces and collect the vertices that are attached to faces with normals that point up.
@@ -204,10 +221,8 @@ def get_inner_vertices(target_object):
             
     return vertices
     
-    
+@timing    
 def is_inside(p, max_dist, obj):
-    # max_dist = 1.84467e+19
-    print('resp=', obj.closest_point_on_mesh(p, distance=max_dist))
     result, point, normal, face = obj.closest_point_on_mesh(p, distance=max_dist)
     
     # Face not found.
@@ -220,6 +235,7 @@ def is_inside(p, max_dist, obj):
     print(v)
     return not(v < 0.0)
 
+@timing
 def raise_vertices(target_object, limit_object, vertices):
     """
     For each vertex of the target_object in the vertices list, raise it up by small steps until it reaches 0 or collides with the limit object.
@@ -237,6 +253,7 @@ def raise_vertices(target_object, limit_object, vertices):
             pos_world.z += 0.05
             cur_vertex.co = target_object.matrix_world.inverted() @ pos_world
 
+@timing
 def get_attach_port_vertices(target_object, type):
     """
     Selects the port vertices and returns them.
@@ -250,13 +267,14 @@ def get_attach_port_vertices(target_object, type):
     
     # Get the 4 vertices. Note that if we calculate for the  hanger we don't want to reverse.
     vertices = sorted(target_object.data.vertices, reverse=type=='HOLDER', key=lambda v: (target_object.matrix_world @ v.co).x)[:4]
-    
-    print(vertices)
+
+    # Set the attach ports selected.
     for v in vertices:
         v.select = True
         
     return vertices
 
+@timing
 def import_hanger(type, hanger_rotation):
     """
     imports the requested hanger.
@@ -282,6 +300,7 @@ def import_hanger(type, hanger_rotation):
 
     return hanger
 
+@timing
 def connect_holder_hanger(holder, hanger):
     """
     Connects the holder and the hanger together.
@@ -297,7 +316,7 @@ def connect_holder_hanger(holder, hanger):
     
     # Make manifold.
     bpy.ops.mesh.normals_make_consistent()
-#    bpy.ops.mesh.print3d_clean_non_manifold()
+    bpy.ops.mesh.print3d_clean_non_manifold()
     
     # Change back to object mode.
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -306,7 +325,7 @@ def connect_holder_hanger(holder, hanger):
 
 
 
-
+@timing
 def main():
     """
     Runs the logic of the program.
@@ -322,7 +341,7 @@ def main():
     wall_thickness = 10
     
     # X rotation of the hanger (to hang on tables or cylinders with different angles).
-    hanger_rotation = 90
+    hanger_rotation = 0
     
     # For the ring hanger, the radius of the cylinder to hang on.
     cylinder_radius = 1
@@ -336,11 +355,14 @@ def main():
     # Copy the target object.
     holder = copy(limit_object)
     
+    # Get the dimensions.
+    dimensions = get_mins_maxs(holder)
+    
     # Remove a part from the top, where we dont want the holder to form.
-    remove_over_xy_plane(holder, z_offset)
+    remove_over_xy_plane(holder, z_offset, dimensions)
     
     # boolean a connection port to the object.
-    add_attach_port(holder, z_offset)
+    add_attach_port(holder, z_offset, dimensions)
     
     # Calculate the convex hull.
     convex_hull(holder)
@@ -381,10 +403,13 @@ def test():
     wall_thickness = 10
     
     # X rotation of the hanger (to hang on tables or cylinders with different angles).
-    hanger_rotation = 90
+    hanger_rotation = 0
     
     # For the ring hanger, the radius of the cylinder to hang on.
     cylinder_radius = 1
+    
+    # Get the dimensions.
+    dimentions = get_mins_maxs(target_object)
     
     # The type of the hanger to use. shoud be on of {TABLE, RING, WALL}
     hanger_type = "TABLE"
