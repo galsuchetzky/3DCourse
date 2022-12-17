@@ -321,7 +321,7 @@ def apply_subsurf_modifier(target_object):
 
 
 @timing
-def get_attach_port_vertices(target_object, type):
+def get_attach_port_vertices(target_object, type, dimensions):
     """
     Selects the port vertices and returns them.
     use type to specify hanger or holder with HANGER, HOLDER.
@@ -333,8 +333,26 @@ def get_attach_port_vertices(target_object, type):
     bpy.ops.object.mode_set(mode='OBJECT')
     
     # Get the 4 vertices. Note that if we calculate for the  hanger we don't want to reverse.
-    vertices = sorted(target_object.data.vertices, reverse=type=='HOLDER', key=lambda v: (target_object.matrix_world @ v.co).x)[:4]
-
+    vertices_tmp = sorted(target_object.data.vertices, reverse=type=='HOLDER', key=lambda v: (target_object.matrix_world @ v.co).x)
+    
+    if type == 'HANGER':
+        vertices = vertices_tmp[:4]
+    
+    else:
+        threshold = min(dimensions[0] - dimensions[3], dimensions[1] - dimensions[4]) / 5
+        vertices = []
+        for v in vertices_tmp:
+            accepted = True
+            for v0 in vertices:
+                if (v.co - v0.co).length < threshold:
+                    accepted = False
+                    break
+            if accepted:
+                vertices.append(v)
+                
+            if len(vertices) == 4:
+                break
+        
     # Set the attach ports selected.
     for v in vertices:
         v.select = True
@@ -430,18 +448,18 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     thicken_shell(holder, wall_thickness)
     
     # Get the attach port vertices.
-    port_vertices = get_attach_port_vertices(holder, 'HOLDER')
+    port_vertices = get_attach_port_vertices(holder, 'HOLDER', dimensions)
     
     # Import the hanger of the specified type.
     hanger = import_hanger(hanger_type, hanger_rotation)
     
     # Get the attach port vertices.
-    port_vertices = get_attach_port_vertices(hanger, 'HANGER')
+    port_vertices = get_attach_port_vertices(hanger, 'HANGER', dimensions)
     
     # Connect the holder and the hanger with a connecting arm.
     connect_holder_hanger(holder, hanger)
     
 
 if __name__ == '__main__':
-#    generate_holder()
-    register()
+    generate_holder()
+#    register()
