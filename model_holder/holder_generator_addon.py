@@ -30,9 +30,9 @@ hanger_types = [
 # UI properties.
 PROPS = [
     ('z_offset', bpy.props.IntProperty(name='Z offset', default=0)),
-    ('shell_scaleup', bpy.props.FloatProperty(name='Shell Scaleup', default=1.05)),
-    ('wall_thickness', bpy.props.FloatProperty(name='Wall Thickness', default=10)),
-    ('hanger_rotation', bpy.props.IntProperty(name='Hanger Rotation', default=0)),
+    ('shell_scaleup', bpy.props.FloatProperty(name='Shell Scaleup', default=1.05, min=1.0)),
+    ('wall_thickness', bpy.props.FloatProperty(name='Wall Thickness', default=10, min=1)),
+    ('hanger_rotation', bpy.props.IntProperty(name='Hanger Rotation', default=0, min=0, max=360)),
     ('hanger_type', bpy.props.EnumProperty(name='Hanger Type', items=hanger_types)),
 ]
 
@@ -56,7 +56,7 @@ class HolderPanel(bpy.types.Panel):
             row = col.row()
             row.prop(context.scene, prop_name)
         col.operator('opr.holder_generator_operator', text='Generate')
-           
+        col.operator('opr.reset_values_operator', text='Reset')
             
 class HolderGeneratorOperator(bpy.types.Operator):
     """
@@ -82,11 +82,40 @@ class HolderGeneratorOperator(bpy.types.Operator):
         generate_holder(*params)
                     
         return {'FINISHED'}
+    
+class ResetValuesOperator(bpy.types.Operator):
+    """
+    Operator to reset the values of the panel.
+    """
+    bl_idname = 'opr.reset_values_operator'
+    bl_label = 'Reset Values'
+    
+    def execute(self, context):
+        """
+        Resets all the values of the addon to their default values.
+        """
+        # Get the params from the UI.
+        params = (
+            context.scene.z_offset,
+            context.scene.shell_scaleup,
+            context.scene.wall_thickness,
+            context.scene.hanger_rotation,
+            context.scene.hanger_type
+        )
+        
+        context.scene.property_unset("z_offset")
+        context.scene.property_unset("shell_scaleup")
+        context.scene.property_unset("wall_thickness")
+        context.scene.property_unset("hanger_rotation")
+        context.scene.property_unset("hanger_type")
+                    
+        return {'FINISHED'}
 
 # Classes to register.
 CLASSES = [
     HolderPanel,
     HolderGeneratorOperator,
+    ResetValuesOperator,
 ]
 
 def register():
@@ -110,6 +139,19 @@ def unregister():
         
     for c in CLASSES:
         bpy.utils.unregister_class(c)
+        
+        
+def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
+    """
+    Display a message to the user.
+    :param message: The message to display.
+    :param title: The box title.
+    :param icon: The icon of the message. Can be "INFO", "WARNING", "ERROR".
+    """
+    def draw(self, context):
+        self.layout.label(text=message)
+
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
 # ---------------- Logic Stuff ---------------- #
 def timing(f):
@@ -419,6 +461,16 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     :param hanger_rotation: X rotation of the hanger (to hang on tables or cylinders with different angles).
     :param hanger_type: The type of the hanger to use. shoud be on of {TABLE, RING, WALL}
     """
+
+    # Check that a target object is selected.
+    if not bpy.context.active_object:
+        ShowMessageBox("Please select the object you would like to generate a holder for.", "Target Object Not Selected", 'ERROR')
+        return
+    
+    # Check that the addon 3D print toolbox is installed.
+    if 'object_print3d_utils' not in bpy.context.preferences.addons.keys():
+        ShowMessageBox("Please install the addon mesh:3D-print-toolbox from the addon preferences.", "3D-print-toolbox not installed", 'ERROR')
+        return
     
     # Save target object.
     limit_object = bpy.context.active_object
@@ -428,15 +480,18 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     
     # Get the dimensions.
     dimensions = get_mins_maxs(holder)
+
+    # Remove a part from the top, where we dont want the holder to form.
+    remove_over_xy_plane(holder, z_offset, dimensions)
+    
+    # Get the dimensions.
+    dimensions = get_mins_maxs(holder)
     
     # boolean a connection port to the object.
     add_attach_port(holder, z_offset, dimensions)
     
     # Calculate the convex hull.
     convex_hull(holder)
-    
-    # Remove a part from the top, where we dont want the holder to form.
-    remove_over_xy_plane(holder, z_offset, dimensions)
     
     # Remove all faces that restrict the object from being pulled straight up.
     delete_blocking_faces(holder)
@@ -461,5 +516,5 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     
 
 if __name__ == '__main__':
-    generate_holder()
-#    register()
+#    generate_holder()
+    register()
