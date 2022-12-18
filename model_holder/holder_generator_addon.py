@@ -1,10 +1,11 @@
 import bpy
+import os.path
 
 from math import radians
 from mathutils import Vector
 from functools import wraps
 from time import time
-
+from bpy_extras.io_utils import ExportHelper
 
 # ---------------- Addon Stuff ---------------- #
 
@@ -34,6 +35,8 @@ PROPS = [
     ('wall_thickness', bpy.props.FloatProperty(name='Wall Thickness', default=10, min=1)),
     ('hanger_rotation', bpy.props.IntProperty(name='Hanger Rotation', default=0, min=0, max=360)),
     ('hanger_type', bpy.props.EnumProperty(name='Hanger Type', items=hanger_types)),
+    ('hanger_dir_path', bpy.props.StringProperty(name="Hanger Dir Path", description="Choose the directory with the hanger files.", default="", maxlen=1023, subtype='DIR_PATH')),
+    
 ]
 
 
@@ -55,6 +58,7 @@ class HolderPanel(bpy.types.Panel):
         for (prop_name, _) in PROPS:
             row = col.row()
             row.prop(context.scene, prop_name)
+        
         col.operator('opr.holder_generator_operator', text='Generate')
         col.operator('opr.reset_values_operator', text='Reset')
             
@@ -75,7 +79,8 @@ class HolderGeneratorOperator(bpy.types.Operator):
             context.scene.shell_scaleup,
             context.scene.wall_thickness,
             context.scene.hanger_rotation,
-            context.scene.hanger_type
+            context.scene.hanger_type,
+            context.scene.hanger_dir_path
         )
         
         # Execute the holder generator.
@@ -100,7 +105,8 @@ class ResetValuesOperator(bpy.types.Operator):
             context.scene.shell_scaleup,
             context.scene.wall_thickness,
             context.scene.hanger_rotation,
-            context.scene.hanger_type
+            context.scene.hanger_type,
+            context.scene.hanger_dir_path
         )
         
         context.scene.property_unset("z_offset")
@@ -108,8 +114,11 @@ class ResetValuesOperator(bpy.types.Operator):
         context.scene.property_unset("wall_thickness")
         context.scene.property_unset("hanger_rotation")
         context.scene.property_unset("hanger_type")
+#        context.scene.property_unset("hanger_dir_path")
                     
         return {'FINISHED'}
+
+
 
 # Classes to register.
 CLASSES = [
@@ -128,6 +137,7 @@ def register():
         
     for c in CLASSES:
         bpy.utils.register_class(c)
+        
     
 def unregister():
     """
@@ -139,6 +149,7 @@ def unregister():
         
     for c in CLASSES:
         bpy.utils.unregister_class(c)
+        
         
         
 def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
@@ -403,7 +414,7 @@ def get_attach_port_vertices(target_object, type, dimensions):
 
 
 @timing
-def import_hanger(type, hanger_rotation):
+def import_hanger(type, hanger_rotation, hangers_dir_path):
     """
     imports the requested hanger.
     TABLE for table mount.
@@ -411,10 +422,11 @@ def import_hanger(type, hanger_rotation):
     RING for cylinder mount.
     """
     # File paths for the hangers stls.
+    
     hanger_file_paths = {
-        "TABLE": r"E:\Projects\3DCourse\files\mounts\clamp_frame.stl",
-        "WALL": r"E:\Projects\3DCourse\files\mounts\wall_mount.stl",
-        "RING": r"E:\Projects\3DCourse\files\mounts\ring_mount.stl"
+        "TABLE": hangers_dir_path + "clamp_frame.stl",
+        "WALL": hangers_dir_path + "wall_mount.stl",
+        "RING": hangers_dir_path + "ring_mount.stl"
     }
     
     # Import the stl.
@@ -452,7 +464,7 @@ def connect_holder_hanger(holder, hanger):
 
 
 @timing
-def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, hanger_rotation = 0, hanger_type = "TABLE"):
+def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, hanger_rotation = 0, hanger_type = "TABLE", hanger_dir_path=""):
     """
     Runs the logic of the program.
     :param z_offset: The offset from the z=0 plane where above it the hanger will not be created.
@@ -461,7 +473,11 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     :param hanger_rotation: X rotation of the hanger (to hang on tables or cylinders with different angles).
     :param hanger_type: The type of the hanger to use. shoud be on of {TABLE, RING, WALL}
     """
-
+    # Make sure that the hangers folder is selected.
+    if not hanger_dir_path:
+        ShowMessageBox("Please select the folder that contains the hanger files. It came with the git repo you cloned.", "Hanger Directory Not Selected", 'ERROR')
+        return
+    
     # Check that a target object is selected.
     if not bpy.context.active_object:
         ShowMessageBox("Please select the object you would like to generate a holder for.", "Target Object Not Selected", 'ERROR')
@@ -506,7 +522,7 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     port_vertices = get_attach_port_vertices(holder, 'HOLDER', dimensions)
     
     # Import the hanger of the specified type.
-    hanger = import_hanger(hanger_type, hanger_rotation)
+    hanger = import_hanger(hanger_type, hanger_rotation, hanger_dir_path)
     
     # Get the attach port vertices.
     port_vertices = get_attach_port_vertices(hanger, 'HANGER', dimensions)

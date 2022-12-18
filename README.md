@@ -8,6 +8,7 @@ Project for a 3d course.
 4. Choose the addon python file you have downloaded in #1.
 5. Search "HolderGenerator" in the search bar.
 6. Enable the addon by enabling the checkbox next to it.
+7. Note that this plugin is relaying on the 3D printing toolbox addon so make sure to enable it as well.
 
 # Usage
 In blender, press 'n' to open the toolbar sidepanel (you can also use the small arrow on the left of the view panel).
