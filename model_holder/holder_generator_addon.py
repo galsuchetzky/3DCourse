@@ -392,7 +392,7 @@ def get_attach_port_vertices(target_object, type, dimensions):
         vertices = vertices_tmp[:4]
     
     else:
-        threshold = min(dimensions[0] - dimensions[3], dimensions[1] - dimensions[4]) / 5
+        threshold = min(dimensions[0] - dimensions[3], dimensions[1] - dimensions[4]) / 10
         vertices = []
         for v in vertices_tmp:
             accepted = True
@@ -464,7 +464,7 @@ def connect_holder_hanger(holder, hanger):
 
 
 @timing
-def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, hanger_rotation = 0, hanger_type = "TABLE", hanger_dir_path=""):
+def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, hanger_rotation = 0, hanger_type = "TABLE", hanger_dir_path="E:\\Projects\\3DCourse\\files\\mounts\\"):
     """
     Runs the logic of the program.
     :param z_offset: The offset from the z=0 plane where above it the hanger will not be created.
@@ -532,5 +532,5 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     
 
 if __name__ == '__main__':
-#    generate_holder()
-    register()
+    generate_holder()
+#    register()
