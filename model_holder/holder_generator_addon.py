@@ -392,7 +392,7 @@ def get_attach_port_vertices(target_object, type, dimensions):
         vertices = vertices_tmp[:4]
     
     else:
-        threshold = min(dimensions[0] - dimensions[3], dimensions[1] - dimensions[4]) / 10
+        threshold = min(dimensions[1] - dimensions[4], dimensions[2] - dimensions[5]) / 10
         vertices = []
         for v in vertices_tmp:
             accepted = True
@@ -442,7 +442,7 @@ def import_hanger(type, hanger_rotation, hangers_dir_path):
 
 
 @timing
-def connect_holder_hanger(holder, hanger):
+def connect_holder_hanger(holder, holder_port_vertices, hanger, hanger_port_vertices):
     """
     Connects the holder and the hanger together.
     """
@@ -455,9 +455,20 @@ def connect_holder_hanger(holder, hanger):
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.convex_hull()
     
+    # Remove any edges that are between vetrices from the hanger vertices or the holder vertices.
+    # might the join change the numbering of the vertices??
+    holder_port_vertices_idxs = [v.index for v in holder_port_vertices]
+    hanger_port_vertices_idxs = [v.index for v in hanger_port_vertices]
+    for edge in hanger.data.edges:
+        v0, v1 = edge.vertices
+        if (v0 in holder_port_vertices_idxs and v1 in holder_port_vertices_idxs) or (v0 in hanger_port_vertices_idxs and v1 in hanger_port_vertices_idxs):
+            print("removing edge", edge.index)
+            hanger.data.edges.remove(edge.index)
+            
+    
     # Make manifold.
     bpy.ops.mesh.normals_make_consistent()
-    bpy.ops.mesh.print3d_clean_non_manifold()
+#    bpy.ops.mesh.print3d_clean_non_manifold()
     
     # Change back to object mode.
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -500,6 +511,16 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     # Remove a part from the top, where we dont want the holder to form.
     remove_over_xy_plane(holder, z_offset, dimensions)
     
+    # Make sure that the removal operation didn't remove the entire object.
+    if len(holder.data.vertices) == 0:
+        ShowMessageBox("Z-offset not covering the object.", "Bad Z-Offset", 'ERROR')
+        
+        # Delete the holder.
+        bpy.ops.object.select_all(action='DESELECT')
+        holder.select_set(True)
+        bpy.ops.object.delete()
+        return
+    
     # Get the dimensions.
     dimensions = get_mins_maxs(holder)
     
@@ -519,18 +540,18 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     thicken_shell(holder, wall_thickness)
     
     # Get the attach port vertices.
-    port_vertices = get_attach_port_vertices(holder, 'HOLDER', dimensions)
+    holder_port_vertices = get_attach_port_vertices(holder, 'HOLDER', dimensions)
     
     # Import the hanger of the specified type.
     hanger = import_hanger(hanger_type, hanger_rotation, hanger_dir_path)
     
     # Get the attach port vertices.
-    port_vertices = get_attach_port_vertices(hanger, 'HANGER', dimensions)
+    hanger_port_vertices = get_attach_port_vertices(hanger, 'HANGER', dimensions)
     
     # Connect the holder and the hanger with a connecting arm.
-    connect_holder_hanger(holder, hanger)
+    connect_holder_hanger(holder, holder_port_vertices, hanger, hanger_port_vertices)
     
 
 if __name__ == '__main__':
-    generate_holder()
-#    register()
+#    generate_holder()
+    register()
