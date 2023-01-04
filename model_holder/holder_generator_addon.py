@@ -361,7 +361,7 @@ def uniform_scale(target_object, s):
     """
     Scales the target object uniformly.
     """
-    # Set scale for the target object to 1.1 of it's size.
+    # Set scale up the target object to 's' of it's size.
     target_object.scale = (s, s, s)
         
 def apply_subsurf_modifier(target_object):
@@ -455,20 +455,20 @@ def connect_holder_hanger(holder, holder_port_vertices, hanger, hanger_port_vert
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.convex_hull()
     
-    # Remove any edges that are between vetrices from the hanger vertices or the holder vertices.
-    # might the join change the numbering of the vertices??
-    holder_port_vertices_idxs = [v.index for v in holder_port_vertices]
-    hanger_port_vertices_idxs = [v.index for v in hanger_port_vertices]
-    for edge in hanger.data.edges:
-        v0, v1 = edge.vertices
-        if (v0 in holder_port_vertices_idxs and v1 in holder_port_vertices_idxs) or (v0 in hanger_port_vertices_idxs and v1 in hanger_port_vertices_idxs):
-            print("removing edge", edge.index)
-            hanger.data.edges.remove(edge.index)
+#    # Remove any edges that are between vetrices from the hanger vertices or the holder vertices.
+#    # might the join change the numbering of the vertices??
+#    holder_port_vertices_idxs = [v.index for v in holder_port_vertices]
+#    hanger_port_vertices_idxs = [v.index for v in hanger_port_vertices]
+#    for edge in hanger.data.edges:
+#        v0, v1 = edge.vertices
+#        if (v0 in holder_port_vertices_idxs and v1 in holder_port_vertices_idxs) or (v0 in hanger_port_vertices_idxs and v1 in hanger_port_vertices_idxs):
+#            print("removing edge", edge.index)
+#            hanger.data.edges.remove(edge.index)
             
     
     # Make manifold.
     bpy.ops.mesh.normals_make_consistent()
-#    bpy.ops.mesh.print3d_clean_non_manifold()
+    bpy.ops.mesh.print3d_clean_non_manifold()
     
     # Change back to object mode.
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -553,5 +553,5 @@ def generate_holder(z_offset = 0, shell_scaleup = 1.05, wall_thickness = 10, han
     
 
 if __name__ == '__main__':
-#    generate_holder()
-    register()
+    generate_holder()
+#    register()
