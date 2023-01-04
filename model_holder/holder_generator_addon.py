@@ -252,11 +252,12 @@ def add_attach_port(target_object, z_offset, dimensions):
     Adds an attach port location to the model.
     Should be used before the convex hull operation.
     """
+    print("dimensions:", dimensions)
     # Get max x to know where to put the port. + 1 to be a bit further.
     port_x = dimensions[0] + 1
     
     # Calculate the height of the port.
-    port_height = abs(dimensions[5]) / 4
+    port_height = abs(dimensions[2] - dimensions[5]) / 3
     
     # Calculate the port width.
     port_width = (dimensions[1] - dimensions[4]) / 4
@@ -468,7 +469,7 @@ def connect_holder_hanger(holder, holder_port_vertices, hanger, hanger_port_vert
     
     # Make manifold.
     bpy.ops.mesh.normals_make_consistent()
-    bpy.ops.mesh.print3d_clean_non_manifold()
+#    bpy.ops.mesh.print3d_clean_non_manifold()
     
     # Change back to object mode.
     bpy.ops.object.mode_set(mode='OBJECT')
