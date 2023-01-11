@@ -114,7 +114,6 @@ class ResetValuesOperator(bpy.types.Operator):
         context.scene.property_unset("wall_thickness")
         context.scene.property_unset("hanger_rotation")
         context.scene.property_unset("hanger_type")
-#        context.scene.property_unset("hanger_dir_path")
                     
         return {'FINISHED'}
 
@@ -174,7 +173,6 @@ def timing(f):
         ts = time()
         result = f(*args, **kw)
         te = time()
-#        print('func:%r args:[%r, %r] took: %2.4f sec' % (f.__name__, args, kw, te-ts))
         print('time: %2.4f sec \t func:%r' % (te-ts, f.__name__))
         return result
     return wrap
@@ -222,7 +220,7 @@ def remove_over_xy_plane(target_object, z_offset, dimensions):
     """
     max_x = max(abs(dimensions[0]), abs(dimensions[3])) + 10
     max_y = max(abs(dimensions[1]), abs(dimensions[4])) + 10
-    max_z = max(dimensions[2], dimensions[5]) + 10
+    max_z = max(abs(dimensions[2]), abs(dimensions[5])) + 10
 
     # Add cube that covers the part of the model that is above the XY plane.
     bpy.ops.mesh.primitive_cube_add(size=2, enter_editmode=False, align='WORLD', location=(0, 0, max_z + z_offset), scale=(max_x, max_y, max_z))
@@ -364,6 +362,8 @@ def uniform_scale(target_object, s):
     """
     # Set scale up the target object to 's' of it's size.
     target_object.scale = (s, s, s)
+    
+
         
 def apply_subsurf_modifier(target_object):
     """
@@ -455,18 +455,7 @@ def connect_holder_hanger(holder, holder_port_vertices, hanger, hanger_port_vert
     # create the connecting arm.
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.convex_hull()
-    
-#    # Remove any edges that are between vetrices from the hanger vertices or the holder vertices.
-#    # might the join change the numbering of the vertices??
-#    holder_port_vertices_idxs = [v.index for v in holder_port_vertices]
-#    hanger_port_vertices_idxs = [v.index for v in hanger_port_vertices]
-#    for edge in hanger.data.edges:
-#        v0, v1 = edge.vertices
-#        if (v0 in holder_port_vertices_idxs and v1 in holder_port_vertices_idxs) or (v0 in hanger_port_vertices_idxs and v1 in hanger_port_vertices_idxs):
-#            print("removing edge", edge.index)
-#            hanger.data.edges.remove(edge.index)
             
-    
     # Make manifold.
     bpy.ops.mesh.normals_make_consistent()
 #    bpy.ops.mesh.print3d_clean_non_manifold()
